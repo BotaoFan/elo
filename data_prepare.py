@@ -11,7 +11,7 @@ pd.set_option('display.width', 1000)
 pd.set_option('display.max_columns', 1000)
 
 
-def read_dir(data_path=''):
+def read_dir_csv(data_path=''):
     if not os.path.isdir(data_path):
         raise IOError('Directory does not exist: %s' % data_path)
     all_files = []
@@ -21,6 +21,7 @@ def read_dir(data_path=''):
     for file in all_files:
         try:
             raw_data[file.replace('.csv', '')] = pd.read_csv(data_path + '/' + file)
+            print('%s has been read' % file)
         except:
             print('The file is not a csv file: %s' % file)
     return raw_data
