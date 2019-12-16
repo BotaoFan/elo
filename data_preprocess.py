@@ -9,6 +9,7 @@ import seaborn as sns
 from datetime import datetime
 
 import data_exploration as de
+import my_code.about_time as abt
 
 
 pd.set_option('display.width', 1000)
@@ -133,10 +134,26 @@ def historical_transaction(data):
     data.loc[data['category_2'].isnull(), 'category_2'] = 126
     data['category_2'] = data['category_2'].astype(np.float16)
     data.loc[data['category_2'] == 126, 'category_2'] = np.nan
-    data['authorized_flag'] = data['authorized_flag'].map({'Y': 1, 'N': 0}).astype(np.in8)
+    data['authorized_flag'] = data['authorized_flag'].map({'Y': 1, 'N': 0}).astype(np.int8)
     data['category_1'] = data['category_1'].map({'Y': 1, 'N': 0}).astype(np.int8)
-    data['category_3'] = data['category_3'].map({'A': 0,'B': 1, 'C': 2}
-                                                )
+    data['category_3'] = data['category_3'].map({'A': 0,'B': 1, 'C': 2})
+    data['price'] = data['purchase_amount'] / (data['installments'] + 0.0)
+    data['purchase_date'] = pd.to_datetime(data['purchase_date'])
+    data['Christmas_Day_2017'] = abt.before_someday(data, 'purchase_date', '2017-12-25', 99)
+    data['Mothers_Day_2017'] = abt.before_someday(data, 'purchase_date', '2017-06-04', 99)
+    data['Fathers_Day_2017'] = abt.before_someday(data, 'purchase_date', '2017-08-13', 99)
+    data['Children_day_2017'] = abt.before_someday(data, 'purchase_date', '2017-10-12', 99)
+    data['Valentine_Day_2017'] = abt.before_someday(data, 'purchase_date', '2017-06-12', 99)
+    data['Black_Friday_2017'] = abt.before_someday(data, 'purchase_date', '2017-11-24', 99)
+    data['Mothers_Day_2018'] = abt.before_someday(data, 'purchase_date', '2018-05-13', 99)
+    data['month_diff'] = (datetime.today() - data['purchase_date']).dt.days // 30
+    data['month_diff'] = data['month_diff'] + data['month_lag']
+
+
+
+
+
+
 
 
 
