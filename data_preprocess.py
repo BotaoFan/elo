@@ -10,6 +10,7 @@ from datetime import datetime
 
 import data_exploration as de
 
+
 pd.set_option('display.width', 1000)
 pd.set_option('display.max_columns', 1000)
 
@@ -79,14 +80,17 @@ def reduce_memory_usage(df):
     print('Decreased by {:2f}'.format(memory_decrease))
     return df
 
+def drop_outlier(data, var, k):
+    (scope_max, scope_min) = de.univar_outlier_scope(data, var, k)
+    data.drop(
+        index=data[(data[var] > scope_max) | (data[var] < scope_min)].index,
+        inplace=True)
+
 
 def process_train(data):
     data = data.copy()
     if 'target' in data.columns:
-        (scope_max, scope_min) = de.univar_outlier_scope(data, 'target', 3)
-        data.drop(
-            index=data[(data['target'] > scope_max) | (data['target'] < scope_min)].index,
-            inplace=True)
+        drop_outlier(data, 'target', 3)
     else:
         data['target'] = np.nan
     #date features
@@ -99,7 +103,6 @@ def process_train(data):
     data['days_feature1_ratio'] = data['feature_1'] / (data['elapsed_time'] + 0.0)
     data['days_feature2_ratio'] = data['feature_2'] / (data['elapsed_time'] + 0.0)
     data['days_feature3_ratio'] = data['feature_3'] / (data['elapsed_time'] + 0.0)
-    data, cols = one_hot_encoder(data, na_as_column=False)
     #feature describe
     data['feature_max'] = data[['feature_1', 'feature_2', 'feature_3']].max(axis=1)
     data['feature_min'] = data[['feature_1', 'feature_2', 'feature_3']].min(axis=1)
@@ -109,8 +112,8 @@ def process_train(data):
     return data
 
 
-def get_train_test_values(train, test, y_name = 'target', include_cols = None):
-    if y_name in test.columns:
+def get_train_test_values(train, test, y_name='target', include_cols=None):
+    if y_name in test.columns and np.sum(~(test[y_name].isnull())) > 0:
         raise KeyError('Test dataframe should not contains %s' % y_name)
     all_data = train.append(test)
     if include_cols is None:
@@ -121,6 +124,19 @@ def get_train_test_values(train, test, y_name = 'target', include_cols = None):
     return train_x_vals, train_y_vals, test_x_vals, col_names
 
 
+def historical_transaction(data):
+    data = data.copy()
+    #Deal with outliers
+    data['installments'].replace(-1, np.nan, inplace=True)
+    data['installments'].replace(999, np.nan, inplace=True)
+    data.loc[data['purchase_amount'] > 0.8, 'purchase_amount'] = 0.8
+    data.loc[data['category_2'].isnull(), 'category_2'] = 126
+    data['category_2'] = data['category_2'].astype(np.float16)
+    data.loc[data['category_2'] == 126, 'category_2'] = np.nan
+    data['authorized_flag'] = data['authorized_flag'].map({'Y': 1, 'N': 0}).astype(np.in8)
+    data['category_1'] = data['category_1'].map({'Y': 1, 'N': 0}).astype(np.int8)
+    data['category_3'] = data['category_3'].map({'A': 0,'B': 1, 'C': 2}
+                                                )
 
 
 
