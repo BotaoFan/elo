@@ -4,9 +4,9 @@
 import os
 import pandas as pd
 import numpy as np
-import tensorflow as tf
-import seaborn as sns
+import lightgbm as lgb
 from datetime import datetime
+import os
 
 import data_exploration as de
 import about_time as abt
@@ -119,6 +119,8 @@ def get_train_test_values(train, test, y_name='target', include_cols=None):
     all_data = train.append(test)
     if include_cols is None:
         col_names = all_data.columns
+    else:
+        col_names = include_cols
     train_x_vals = all_data.loc[~(all_data[y_name].isnull()), col_names].values
     test_x_vals = all_data.loc[(all_data[y_name].isnull()), col_names].values
     train_y_vals = all_data.loc[~(all_data[y_name].isnull()), y_name].values
@@ -194,14 +196,64 @@ def transaction_to_feature(data):
     features = reduce_memory_usage(features)
     return features
 
+
+def train(all_train, all_test):
+    include_cols = [c for c in all_train.columns if
+                    c not in ['card_id', 'first_active_month', 'hist_purchase_date_max', 'hist_purchase_date_min',
+                              'new_purchase_date_max', 'new_purchase_date_min']]
+    train_x_values, train_y_values, test_x_values, col_names = \
+        get_train_test_values(all_train, all_test, 'target', include_cols=include_cols)
+    train_x, valid_x = \
+        train_x_values[:int(len(train_x_values) * 0.9), :],  train_x_values[int(len(train_x_values) * 0.9):, :]
+    train_y, valid_y = \
+        train_y_values[:int(len(train_y_values) * 0.9)],  train_y_values[int(len(train_y_values) * 0.9):]
+    lgb_train = lgb.Dataset(train_x, label=train_y)
+    lgb_valid = lgb.Dataset(valid_x, label=valid_y)
+    params = {
+        'task': 'train',
+        'boosting': 'goss',
+        'objective': 'regression',
+        'metric': 'rmse',
+        'learning_rate': 0.01,
+        'subsample': 0.9855232997390695,
+        'max_depth': 7,
+        'top_rate': 0.9064148448434349,
+        'num_leaves': 63,
+        'min_child_weight': 41.9612869171337,
+        'other_rate': 0.0721768246018207,
+        'reg_alpha': 9.677537745007898,
+        'colsample_bytree': 0.5665320670155495,
+        'min_split_gain': 9.820197773625843,
+        'reg_lambda': 8.2532317400459,
+        'min_data_in_leaf': 21,
+        'verbose': -1,
+    }
+    reg = lgb.train(
+        params,
+        lgb_train,
+        valid_sets=[lgb_train, lgb_valid],
+        valid_names=['train', 'valid'],
+        num_boost_round=2000,
+        early_stopping_rounds=100,
+        verbose_eval=100
+    )
+    test_pred = reg.predict(test_x_values, num_iteration=reg.best_iteration)
+    result = all_test[['card_id']]
+    result['target'] = test_pred
+    result.set_index('card_id', inplace=True)
+
+
 if __name__ == '__main__':
-    path = '/Users/fan/kaggle/data/elo-merchant-category-recommendation'
+    path = os.getcwd() + '/../data'
     raw_data = read_dir_csv(path)
+    print('--------- Raw data has been read ---------')
     train, test = raw_data['train'], raw_data['test']
     train, test = reduce_memory_usage(train), reduce_memory_usage(test)
     train, test = process_train(train), process_train(test)
+    print('--------- Preprocessing has been done ---------')
     tran_feats_hist = transaction_to_feature(raw_data['historical_transactions'])
     tran_feats_new = transaction_to_feature(raw_data['new_merchant_transactions'])
+    print('--------- Features generating has benn done ---------')
     tran_feats_hist.columns = ['hist_' + c for c in tran_feats_hist.columns]
     tran_feats_new.columns = ['new_' + c for c in tran_feats_new.columns]
     train.set_index('card_id', inplace=True), test.set_index('card_id', inplace=True)
