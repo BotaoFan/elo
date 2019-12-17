@@ -9,7 +9,7 @@ import seaborn as sns
 from datetime import datetime
 
 import data_exploration as de
-import my_code.about_time as abt
+import about_time as abt
 
 
 pd.set_option('display.width', 1000)
@@ -125,9 +125,10 @@ def get_train_test_values(train, test, y_name='target', include_cols=None):
     return train_x_vals, train_y_vals, test_x_vals, col_names
 
 
-def historical_transaction(data):
+def transaction_to_feature(data):
     data = data.copy()
     #Deal with outliers
+    print('Data has been copied!')
     data['installments'].replace(-1, np.nan, inplace=True)
     data['installments'].replace(999, np.nan, inplace=True)
     data.loc[data['purchase_amount'] > 0.8, 'purchase_amount'] = 0.8
@@ -139,6 +140,12 @@ def historical_transaction(data):
     data['category_3'] = data['category_3'].map({'A': 0,'B': 1, 'C': 2})
     data['price'] = data['purchase_amount'] / (data['installments'] + 0.0)
     data['purchase_date'] = pd.to_datetime(data['purchase_date'])
+    data['month'] = data['purchase_date'].dt.month
+    data['day'] = data['purchase_date'].dt.day
+    data['hour'] = data['purchase_date'].dt.hour
+    data['weekofyear'] = data['purchase_date'].dt.weekofyear
+    data['weekday'] = data['purchase_date'].dt.weekday
+    data['weekend'] = (data['purchase_date'].dt.weekday >= 5).astype(np.int8)
     data['Christmas_Day_2017'] = abt.before_someday(data, 'purchase_date', '2017-12-25', 99)
     data['Mothers_Day_2017'] = abt.before_someday(data, 'purchase_date', '2017-06-04', 99)
     data['Fathers_Day_2017'] = abt.before_someday(data, 'purchase_date', '2017-08-13', 99)
@@ -148,26 +155,64 @@ def historical_transaction(data):
     data['Mothers_Day_2018'] = abt.before_someday(data, 'purchase_date', '2018-05-13', 99)
     data['month_diff'] = (datetime.today() - data['purchase_date']).dt.days // 30
     data['month_diff'] = data['month_diff'] + data['month_lag']
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+    data['duration'] = data['purchase_amount']*data['month_diff']
+    data['amount_month_ratio'] = data['purchase_amount']/(data['month_diff'] + 0.0)
+    data = reduce_memory_usage(data)
+    print('Data has been preprocess!')
+    aggs = {}
+    col_unique = ['subsector_id', 'merchant_id', 'merchant_category_id']
+    col_seas = ['month', 'hour', 'weekofyear', 'weekday', 'day']
+    for col in col_unique:
+        aggs[col] = ['nunique']
+    for col in col_seas:
+        aggs[col] = ['nunique', 'mean', 'min', 'max']
+    aggs['purchase_amount'] = ['sum', 'max', 'min', 'mean', 'var', 'skew']
+    aggs['installments'] = ['sum', 'max', 'mean', 'var', 'skew']
+    aggs['purchase_date'] = ['max', 'min']
+    aggs['month_lag'] = ['max', 'min', 'mean', 'var', 'skew']
+    aggs['month_diff'] = ['max', 'min', 'mean', 'var', 'skew']
+    aggs['authorized_flag'] = ['mean']
+    aggs['weekend'] = ['mean']#overwrite
+    aggs['weekday'] = ['mean']#overwrite
+    aggs['day'] = ['nunique', 'mean', 'min'] # overwrite
+    aggs['category_1'] = ['mean']
+    aggs['category_2'] = ['mean']
+    aggs['category_3'] = ['mean']
+    aggs['card_id'] = ['size', 'count']
+    aggs['price'] = ['sum', 'mean', 'max', 'min', 'var']
+    aggs['Christmas_Day_2017'] = ['mean']
+    aggs['Mothers_Day_2017'] = ['mean']
+    aggs['Fathers_Day_2017'] = ['mean']
+    aggs['Children_day_2017'] = ['mean']
+    aggs['Valentine_Day_2017'] = ['mean']
+    aggs['Black_Friday_2017'] = ['mean']
+    aggs['Mothers_Day_2018'] = ['mean']
+    aggs['duration'] = ['mean', 'min', 'max', 'var', 'skew']
+    aggs['amount_month_ratio'] = ['mean', 'min', 'max', 'var', 'skew']
+    features = data.groupby('card_id').agg(aggs)
+    features.columns = pd.Index([e[0] + '_' + e[1] for e in features.columns.to_list()])
+    features = reduce_memory_usage(features)
+    return features
 
 if __name__ == '__main__':
-    path = '/Users/botaofan/PycharmProjects/elo'
-    data_path = path + '/data'
-    raw_data = read_dir_csv(data_path)
+    path = '/Users/fan/kaggle/data/elo-merchant-category-recommendation'
+    raw_data = read_dir_csv(path)
     train, test = raw_data['train'], raw_data['test']
     train, test = reduce_memory_usage(train), reduce_memory_usage(test)
     train, test = process_train(train), process_train(test)
+    tran_feats_hist = transaction_to_feature(raw_data['historical_transactions'])
+    tran_feats_new = transaction_to_feature(raw_data['new_merchant_transactions'])
+    tran_feats_hist.columns = ['hist_' + c for c in tran_feats_hist.columns]
+    tran_feats_new.columns = ['new_' + c for c in tran_feats_new.columns]
+    train.set_index('card_id', inplace=True), test.set_index('card_id', inplace=True)
+    all_train = train.join(tran_feats_hist).join(tran_feats_new)
+    all_test = test.join(tran_feats_hist).join(tran_feats_new)
+    all_train[all_train == np.inf] = np.nan
+    all_train[all_train == -np.inf] = np.nan
+    all_test[all_test == np.inf] = np.nan
+    all_test[all_test == -np.inf] = np.nan
+    all_train.to_csv(path + '/all_train.csv')
+    all_test.to_csv(path + '/all_test.csv')
+
+
 
