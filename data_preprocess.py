@@ -8,8 +8,8 @@ import lightgbm as lgb
 from datetime import datetime
 import os
 
-import data_exploration as de
-import about_time as abt
+import my_code.data_exploration as de
+import my_code.about_time as abt
 
 
 pd.set_option('display.width', 1000)
@@ -139,7 +139,7 @@ def transaction_to_feature(data):
     data.loc[data['category_2'] == 126, 'category_2'] = np.nan
     data['authorized_flag'] = data['authorized_flag'].map({'Y': 1, 'N': 0}).astype(np.int8)
     data['category_1'] = data['category_1'].map({'Y': 1, 'N': 0}).astype(np.int8)
-    data['category_3'] = data['category_3'].map({'A': 0,'B': 1, 'C': 2})
+    data['category_3'] = data['category_3'].map({'A': 0, 'B': 1, 'C': 2})
     data['price'] = data['purchase_amount'] / (data['installments'] + 0.0)
     data['purchase_date'] = pd.to_datetime(data['purchase_date'])
     data['month'] = data['purchase_date'].dt.month

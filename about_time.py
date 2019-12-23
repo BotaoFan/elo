@@ -3,7 +3,7 @@
 # @Author : Botao Fan
 from datetime import datetime
 import pandas as pd
-import numpy as np
+
 
 
 def before_someday(data, var, someday='2017-12-25', max_before_day=99):
