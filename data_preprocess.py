@@ -8,8 +8,8 @@ import lightgbm as lgb
 from datetime import datetime
 import os
 
-import my_code.data_exploration as de
-import my_code.about_time as abt
+import elo.data_exploration as de
+import elo.about_time as abt
 
 
 pd.set_option('display.width', 1000)
