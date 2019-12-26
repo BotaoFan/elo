@@ -8,8 +8,8 @@ import lightgbm as lgb
 from datetime import datetime
 import os
 
-import my_code.data_exploration as de
-import my_code.about_time as abt
+import elo.data_exploration as de
+import elo.about_time as abt
 
 
 pd.set_option('display.width', 1000)
@@ -195,6 +195,19 @@ def transaction_to_feature(data):
     features.columns = pd.Index([e[0] + '_' + e[1] for e in features.columns.to_list()])
     features = reduce_memory_usage(features)
     return features
+
+
+def get_train_valid_test_data(all_train, all_test, exclude_columns=[], valid_proportion=0.1):
+    include_columns = [c for c in all_train.columns if c not in exclude_columns]
+    train_valid_x, train_valid_y, test_x, column_names = \
+        get_train_test_values(all_train, all_test, 'target', include_cols=include_columns)
+    train_proportion = 1 - valid_proportion
+    train_x, valid_x = train_valid_x[:int(len(train_valid_x) * train_proportion), :],  \
+                       train_valid_x[int(len(train_valid_x) * train_proportion):, :]
+    train_y, valid_y = train_valid_y[:int(len(train_valid_y) * train_proportion)],  \
+                       train_valid_y[int(len(train_valid_y) * train_proportion):]
+    return train_x, train_y, valid_x, valid_y, test_x, column_names
+
 
 
 def train(all_train, all_test):
